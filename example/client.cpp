@@ -37,30 +37,18 @@ int main()
         std::cerr << "Request timed out, seq=" << seq << "\n";
     });
 
-    // Connect to server
-    client->connect(5000,
-        [&](const boost::system::error_code& ec) {
-            if (ec) {
-                std::cerr << "Connect failed: " << ec.message() << "\n";
-                return;
-            }
-            std::cout << "Connected to server\n";
+    client->start();
 
-            // Send a binding packet (packetId=0x01)
-            // const char* bindMsg = "client_bind_user";
-            // client->sendPacket(0x01, 0x00, 1, reinterpret_cast<const uint8_t*>(bindMsg), std::strlen(bindMsg));
+    using namespace std::chrono_literals;
+    std::this_thread::sleep_for(5s);
 
-            using namespace std::chrono_literals;
-            std::this_thread::sleep_for(5s);
-
-            // Send a request and get sequence
-            const char* req = "hello_server";
-            uint32_t seq = client->sendRequest(reinterpret_cast<const uint8_t*>(req), std::strlen(req));
-            std::cout << "Sent request seq=" << seq << "\n";
-        });
+    // Send a request and get sequence
+    const char* req = "hello_server";
+    uint32_t seq = client->sendRequest(reinterpret_cast<const uint8_t*>(req), std::strlen(req));
+    std::cout << "Sent request seq=" << seq << "\n";
 
     // Run until enter pressed
-    std::cout << "Press Enter to exit...";
+    std::cout << "Press Enter to exit...\n";
     std::cin.get();
     client->close();
     return 0;

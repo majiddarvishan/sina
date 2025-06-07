@@ -78,16 +78,15 @@ void TurboNetClient::setCloseHandler(CloseHandler handler) {
     onClose_ = std::move(handler);
 }
 
-void TurboNetClient::connect(int timeoutMs,
-                             std::function<void(const boost::system::error_code&)> onConnect) {
-    connectHandler_ = std::move(onConnect);
+void TurboNetClient::do_connect()
+{
     boost::asio::ip::tcp::resolver resolver(*ioCtx_);
     auto endpoints = resolver.resolve(host_, std::to_string(port_));
 
-    startConnectTimer(timeoutMs);
+    // startConnectTimer(timeoutMs);
     boost::asio::async_connect(socket_, endpoints,
         boost::asio::bind_executor(strand_, [self = shared_from_this()](const boost::system::error_code& ec, auto&) {
-            self->cancelConnectTimer();
+            // self->cancelConnectTimer();
             if (!ec) {
                 // Auto-bind
                 if (!self->clientId_.empty()) {
@@ -120,7 +119,9 @@ void TurboNetClient::sendPacket(uint8_t packetId,
     boost::asio::post(strand_, [self = shared_from_this(), pkt = std::move(pkt)]() mutable {
         bool writing = !self->txBuffer_.empty();
         self->txBuffer_.insert(self->txBuffer_.end(), pkt.begin(), pkt.end());
-        if (!writing) self->doWrite();
+
+        if (!writing)
+            self->doWrite();
     });
 }
 
@@ -163,8 +164,10 @@ void TurboNetClient::onReadHeader(const boost::system::error_code& ec, std::size
     lastStatus_   = headerBuf_[5];
     lastSequence_ = fromBigEndian(headerBuf_.data() + 6);
 
-    if (packetLen >= 10) doReadBody(packetLen - 10);
-    else doReadHeader();
+    if (packetLen >= 10)
+        doReadBody(packetLen - 10);
+    else
+        doReadHeader();
 }
 
 void TurboNetClient::doReadBody(uint32_t bodyLen) {
@@ -177,6 +180,7 @@ void TurboNetClient::doReadBody(uint32_t bodyLen) {
 
 void TurboNetClient::onReadBody(const boost::system::error_code& ec, std::size_t) {
     cancelReadTimer();
+    cancelResponseTimer(lastSequence_);
     if (!ec) {
         // Bind-response
         if (lastPacketId_ == 0x81 && onBind_) {
@@ -226,8 +230,10 @@ void TurboNetClient::startReadTimer() {
         self->onReadTimeout(ec);
     }));
 }
-void TurboNetClient::cancelReadTimer() {
-    boost::system::error_code ec; readTimer_.cancel(ec);
+void TurboNetClient::cancelReadTimer()
+{
+    boost::system::error_code ec;
+    readTimer_.cancel(ec);
 }
 void TurboNetClient::onReadTimeout(const boost::system::error_code& ec) {
     if (!ec) socket_.close();

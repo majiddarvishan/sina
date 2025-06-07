@@ -41,10 +41,12 @@ public:
                    std::size_t ioThreads = std::thread::hardware_concurrency());
     ~TurboNetClient();
 
-    // Connect to server with timeout
-    void connect(
-                 int timeoutMs,
-                 std::function<void(const boost::system::error_code&)> onConnect);
+    void start()
+    {
+        do_connect();
+    }
+
+    void do_connect();
 
     // Set client-side ID to bind
     // void setClientId(const std::string& clientId);
