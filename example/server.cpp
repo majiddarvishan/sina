@@ -6,7 +6,7 @@ int main()
 {
     using namespace turbonet;
     // Authorized client IDs
-    std::unordered_set<std::string> validClients = {"client_123", "client_abc"};
+    std::unordered_set<std::string> validClients = {"client_123", "test_client"};
 
     // Create server on port 9000, max 10 connections
     TurboNetServer server(9000, 10);

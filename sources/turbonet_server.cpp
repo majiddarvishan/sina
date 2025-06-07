@@ -51,9 +51,11 @@ void TurboNetServer::Session::onReadBody(const boost::system::error_code& ec, st
     if (ec) { serverRef.removeSession(shared_from_this()); return; }
 
     // Handle bind request
-    if (!authenticated && headerBuf[4] == 0x01) {
+    if (!authenticated && headerBuf[4] == 0x01)
+    {
         std::string cid(bodyBuf.begin(), bodyBuf.end());
-        if (serverRef.onAuth_ && serverRef.onAuth_(cid)) {
+        if (serverRef.onAuth_ && serverRef.onAuth_(cid))
+        {
             authenticated = true;
             // Send bind-resp
             std::string id = "test_server";

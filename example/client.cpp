@@ -5,12 +5,24 @@
 
 int main()
 {
+    boost::asio::io_context io_context;
     // Create client with 5s read/write timeout and 10s response timeout
-    auto client = std::make_shared<turbonet::TurboNetClient>(5000, 5000, 10000);
-    client->setClientId("client_123");
-    client->setBindHandler([](const std::string& serverId) -> void {
-        std::cout << "bind successfully to server='" << serverId << "'\n";
-    });
+    auto client = std::make_shared<turbonet::TurboNetClient>(&io_context,
+        "test_client",
+        "127.0.0.1",
+        9000,
+        100,
+        [](const std::string& serverId) -> void {
+            std::cout << "bind successfully to server='" << serverId << "'\n";
+        },
+        [](const std::string& serverId) -> void {
+            std::cout << "error to server='" << serverId << "'\n";
+        },
+        5000, 5000, 10000);
+    // client->setClientId("client_123");
+    // client->setBindHandler([](const std::string& serverId) -> void {
+    //     std::cout << "bind successfully to server='" << serverId << "'\n";
+    // });
 
     // Set packet handler
     client->setPacketHandler([](uint8_t packetId, uint8_t status, uint32_t seq, const std::vector<uint8_t>& payload) {
@@ -26,7 +38,7 @@ int main()
     });
 
     // Connect to server
-    client->connect("127.0.0.1", 9000, 5000,
+    client->connect(5000,
         [&](const boost::system::error_code& ec) {
             if (ec) {
                 std::cerr << "Connect failed: " << ec.message() << "\n";
@@ -37,6 +49,9 @@ int main()
             // Send a binding packet (packetId=0x01)
             // const char* bindMsg = "client_bind_user";
             // client->sendPacket(0x01, 0x00, 1, reinterpret_cast<const uint8_t*>(bindMsg), std::strlen(bindMsg));
+
+            using namespace std::chrono_literals;
+            std::this_thread::sleep_for(5s);
 
             // Send a request and get sequence
             const char* req = "hello_server";

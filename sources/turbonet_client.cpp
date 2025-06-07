@@ -5,6 +5,7 @@
 #include <boost/asio/connect.hpp>
 
 #include <cstring>
+#include <iostream>
 
 namespace turbonet {
 
@@ -19,41 +20,53 @@ uint32_t TurboNetClient::fromBigEndian(const uint8_t* b) {
 }
 
 // Constructor / Destructor
-TurboNetClient::TurboNetClient(int readTimeoutMs,
+TurboNetClient::TurboNetClient(boost::asio::io_context* io_context,
+    const std::string& client_id,
+        std::string_view ip_address,
+        uint16_t port,
+        uint16_t inactivity_timeout,
+        bind_handler_t bind_handler,
+        error_handler_t error_handler,
+    int readTimeoutMs,
                                int writeTimeoutMs,
                                int responseTimeoutMs,
                                std::size_t ioThreads)
-    : ioCtx_(),
-      workGuard_(boost::asio::make_work_guard(ioCtx_)),
-      socket_(ioCtx_),
-      connectTimer_(ioCtx_),
-      readTimer_(ioCtx_),
-      writeTimer_(ioCtx_),
-      responseSweepTimer_(ioCtx_),
-      strand_(boost::asio::make_strand(ioCtx_)),
-      readTimeoutMs_(readTimeoutMs),
-      writeTimeoutMs_(writeTimeoutMs),
-      responseTimeoutMs_(responseTimeoutMs) {
+    : ioCtx_{io_context}
+      ,workGuard_(boost::asio::make_work_guard(*ioCtx_))
+      ,socket_(*ioCtx_)
+      ,connectTimer_(*ioCtx_)
+      ,readTimer_(*ioCtx_)
+      ,writeTimer_(*ioCtx_)
+      ,responseSweepTimer_(*ioCtx_)
+      ,strand_(boost::asio::make_strand(*ioCtx_))
+      ,onBind_{bind_handler}
+      ,clientId_{client_id}
+      ,readTimeoutMs_(readTimeoutMs)
+      ,writeTimeoutMs_(writeTimeoutMs)
+      ,responseTimeoutMs_(responseTimeoutMs)
+      ,host_{ip_address}
+      ,port_{port}
+{
     running_ = true;
     for (std::size_t i = 0; i < ioThreads; ++i) {
-        ioThreads_.emplace_back([this] { ioCtx_.run(); });
+        ioThreads_.emplace_back([this] { ioCtx_->run(); });
     }
 }
 
 TurboNetClient::~TurboNetClient() {
     close();
     workGuard_.reset();
-    ioCtx_.stop();
+    ioCtx_->stop();
     for (auto& t : ioThreads_) if (t.joinable()) t.join();
 }
 
 // Public API
-void TurboNetClient::setClientId(const std::string& clientId) {
-    clientId_ = clientId;
-}
-void TurboNetClient::setBindHandler(BindHandler handler) {
-    onBind_ = std::move(handler);
-}
+// void TurboNetClient::setClientId(const std::string& clientId) {
+//     clientId_ = clientId;
+// }
+// void TurboNetClient::setBindHandler(BindHandler handler) {
+//     onBind_ = std::move(handler);
+// }
 void TurboNetClient::setPacketHandler(PacketHandler handler) {
     onPacket_ = std::move(handler);
 }
@@ -65,13 +78,11 @@ void TurboNetClient::setCloseHandler(CloseHandler handler) {
     onClose_ = std::move(handler);
 }
 
-void TurboNetClient::connect(const std::string& host,
-                             uint16_t port,
-                             int timeoutMs,
+void TurboNetClient::connect(int timeoutMs,
                              std::function<void(const boost::system::error_code&)> onConnect) {
     connectHandler_ = std::move(onConnect);
-    boost::asio::ip::tcp::resolver resolver(ioCtx_);
-    auto endpoints = resolver.resolve(host, std::to_string(port));
+    boost::asio::ip::tcp::resolver resolver(*ioCtx_);
+    auto endpoints = resolver.resolve(host_, std::to_string(port_));
 
     startConnectTimer(timeoutMs);
     boost::asio::async_connect(socket_, endpoints,
@@ -87,7 +98,7 @@ void TurboNetClient::connect(const std::string& host,
                 }
                 self->doReadHeader();
             }
-            if (self->connectHandler_) self->connectHandler_(ec);
+            // if (self->connectHandler_) self->connectHandler_(ec);
         }));
 }
 

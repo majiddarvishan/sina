@@ -20,27 +20,36 @@ using PacketHandler = std::function<void(uint8_t packetId,
                                          uint32_t sequence,
                                          const std::vector<uint8_t>& payload)>;
 using TimeoutHandler = std::function<void(uint32_t sequence)>;
-using BindHandler = std::function<void(const std::string& serverId)>;
+using bind_handler_t = std::function<void(const std::string& serverId)>;
 using CloseHandler = std::function<void()>;
+
+// using bind_handler_t = std::function<void(const std::string&)>;
+    using error_handler_t = std::function<void(const std::string&)>;
 
 class TurboNetClient : public std::enable_shared_from_this<TurboNetClient> {
 public:
-    TurboNetClient(int readTimeoutMs = 0,
+    TurboNetClient(boost::asio::io_context* io_context,
+        const std::string& client_id,
+        std::string_view ip_address,
+        uint16_t port,
+        uint16_t inactivity_timeout,
+        bind_handler_t bind_handler,
+        error_handler_t error_handler,
+        int readTimeoutMs = 0,
                    int writeTimeoutMs = 0,
                    int responseTimeoutMs = 0,
                    std::size_t ioThreads = std::thread::hardware_concurrency());
     ~TurboNetClient();
 
     // Connect to server with timeout
-    void connect(const std::string& host,
-                 uint16_t port,
+    void connect(
                  int timeoutMs,
                  std::function<void(const boost::system::error_code&)> onConnect);
 
     // Set client-side ID to bind
-    void setClientId(const std::string& clientId);
+    // void setClientId(const std::string& clientId);
     // Bind-response handler
-    void setBindHandler(BindHandler handler);
+    // void setBindHandler(BindHandler handler);
     void setCloseHandler(CloseHandler handler);
 
     // Send arbitrary packet
@@ -92,7 +101,7 @@ private:
     static uint32_t toBigEndian(uint32_t v);
     static uint32_t fromBigEndian(const uint8_t* b);
 
-    boost::asio::io_context                                  ioCtx_;
+    boost::asio::io_context*                                  ioCtx_;
     boost::asio::executor_work_guard<boost::asio::io_context::executor_type> workGuard_;
     boost::asio::ip::tcp::socket                             socket_;
     boost::asio::steady_timer                                connectTimer_;
@@ -109,7 +118,7 @@ private:
 
     PacketHandler                                     onPacket_;
     TimeoutHandler                                    onTimeout_;
-    BindHandler                                       onBind_;
+    bind_handler_t                                       onBind_;
     CloseHandler onClose_;
     std::function<void(const boost::system::error_code&)>      connectHandler_;
 
@@ -118,6 +127,9 @@ private:
     int                                               responseTimeoutMs_;
 
     std::atomic<uint32_t>                             sequenceCounter_{1};
+
+    std::string host_;
+    uint16_t port_;
 
     struct ResponseEntry {
         uint32_t sequence;
